@@ -1,7 +1,7 @@
 import { ENEMY_TYPES, CANVAS_CONFIG, DIFFICULTY_SCALING } from '../constants.js';
 
 export class Enemy {
-  constructor({ typeId, x, y, wave = 1 }) {
+  constructor({ typeId, x, y, wave = 1, difficulty = null }) {
     const config = ENEMY_TYPES[typeId] || ENEMY_TYPES.goblin;
     this.id = Math.random().toString(36).substring(2, 9);
     this.typeId = config.id;
@@ -12,13 +12,18 @@ export class Enemy {
     this.behavior = config.behavior;
     this.knockbackResistance = config.knockbackResistance || 0;
 
+    const hpMult = difficulty?.hpMultiplier || 1.0;
+    const dmgMult = difficulty?.damageMultiplier || 1.0;
+    const speedMult = difficulty?.speedMultiplier || 1.0;
+    const goldMult = difficulty?.goldMultiplier || 1.0;
+
     // Progression scaling
-    const hpScale = 1 + DIFFICULTY_SCALING.hpScalePerWave * (wave - 1);
-    const dmgScale = 1 + DIFFICULTY_SCALING.damageScalePerWave * (wave - 1);
-    const speedScale = 1 + Math.min(
+    const hpScale = (1 + DIFFICULTY_SCALING.hpScalePerWave * (wave - 1)) * hpMult;
+    const dmgScale = (1 + DIFFICULTY_SCALING.damageScalePerWave * (wave - 1)) * dmgMult;
+    const speedScale = (1 + Math.min(
       DIFFICULTY_SCALING.maxSpeedBonus,
       DIFFICULTY_SCALING.speedScalePerWave * (wave - 1)
-    );
+    )) * speedMult;
 
     this.maxHp = Math.round(config.baseHp * hpScale);
     this.hp = this.maxHp;
@@ -31,8 +36,8 @@ export class Enemy {
     // Drop config
     this.xpReward = Math.round(config.xpReward * (1 + 0.1 * (wave - 1)));
     this.goldChance = config.goldChance;
-    this.goldMin = config.goldMin;
-    this.goldMax = config.goldMax;
+    this.goldMin = Math.round(config.goldMin * goldMult);
+    this.goldMax = Math.round(config.goldMax * goldMult);
 
     // Transform & Physics
     this.x = x;

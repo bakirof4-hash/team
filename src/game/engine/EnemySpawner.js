@@ -66,12 +66,17 @@ export class EnemySpawner {
     });
   }
 
+  setDifficulty(difficultyConfig) {
+    this.difficulty = difficultyConfig;
+  }
+
   spawnMinionAt(typeId, x, y) {
     const enemy = new Enemy({
       typeId,
       x,
       y,
       wave: this.wave,
+      difficulty: this.difficulty,
     });
     this.enemies.push(enemy);
     return enemy;
@@ -107,6 +112,7 @@ export class EnemySpawner {
       x,
       y,
       wave: this.wave,
+      difficulty: this.difficulty,
     });
 
     this.enemies.push(enemy);

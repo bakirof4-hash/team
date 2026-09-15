@@ -1,16 +1,32 @@
 import { PLAYER_CONFIG, CANVAS_CONFIG } from '../constants.js';
+import { sounds } from './SoundSystem.js';
 
 export class Player {
-  constructor(x = CANVAS_CONFIG.ARENA_WIDTH / 2, y = CANVAS_CONFIG.ARENA_HEIGHT / 2) {
+  constructor(x = CANVAS_CONFIG.ARENA_WIDTH / 2, y = CANVAS_CONFIG.ARENA_HEIGHT / 2, characterConfig = null) {
     this.x = x;
     this.y = y;
     this.vx = 0;
     this.vy = 0;
     this.radius = PLAYER_CONFIG.RADIUS;
 
+    this.character = characterConfig || {
+      id: 'knight',
+      name: 'Jangchi Paladin',
+      color: '#3b82f6',
+      stats: {
+        hp: PLAYER_CONFIG.MAX_HP,
+        speed: PLAYER_CONFIG.SPEED,
+        damage: PLAYER_CONFIG.ATTACK_DAMAGE,
+        critChance: PLAYER_CONFIG.CRIT_CHANCE * 100,
+        specialCooldown: PLAYER_CONFIG.SPECIAL_COOLDOWN,
+      },
+    };
+
+    const stats = this.character.stats || {};
+
     // Attributes
-    this.speed = PLAYER_CONFIG.SPEED;
-    this.maxHp = PLAYER_CONFIG.MAX_HP;
+    this.speed = stats.speed || PLAYER_CONFIG.SPEED;
+    this.maxHp = stats.hp || PLAYER_CONFIG.MAX_HP;
     this.hp = this.maxHp;
     this.hpRegen = PLAYER_CONFIG.HP_REGEN;
     this.magnetRadius = PLAYER_CONFIG.MAGNET_RADIUS;
@@ -23,14 +39,14 @@ export class Player {
     this.kills = 0;
 
     // Combat Stats
-    this.baseDamage = PLAYER_CONFIG.ATTACK_DAMAGE;
-    this.critChance = PLAYER_CONFIG.CRIT_CHANCE;
+    this.baseDamage = stats.damage || PLAYER_CONFIG.ATTACK_DAMAGE;
+    this.critChance = (stats.critChance || 18) / 100;
     this.critMultiplier = PLAYER_CONFIG.CRIT_MULTIPLIER;
     this.attackCooldown = PLAYER_CONFIG.ATTACK_COOLDOWN;
     this.attackTimer = 0;
 
-    // Special Whirlwind Attack
-    this.specialCooldown = PLAYER_CONFIG.SPECIAL_COOLDOWN;
+    // Special Attack
+    this.specialCooldown = stats.specialCooldown || PLAYER_CONFIG.SPECIAL_COOLDOWN;
     this.specialTimer = 0;
 
     // Dash
@@ -48,7 +64,7 @@ export class Player {
     // Animation & facing
     this.facingAngle = 0;
     this.walkCycle = 0;
-    this.swingProgress = 0; // for sword swing visual
+    this.swingProgress = 0;
   }
 
   takeDamage(amount, damageNumbers, particleSystem) {
@@ -60,6 +76,8 @@ export class Player {
     this.hp -= actualDamage;
     this.invulnerableTimer = PLAYER_CONFIG.INVULNERABLE_TIME;
 
+    sounds.playHit();
+
     if (damageNumbers) {
       damageNumbers.addPlayerDamage(this.x, this.y - this.radius, actualDamage);
     }
@@ -70,6 +88,7 @@ export class Player {
     if (this.hp <= 0) {
       this.hp = 0;
       this.isDead = true;
+      sounds.playExplosion();
       if (particleSystem) {
         particleSystem.createDeathExplosion(this.x, this.y, this.radius * 1.5, '#ef4444');
       }
@@ -101,13 +120,14 @@ export class Player {
     this.level += 1;
     this.maxXp = Math.round(this.maxXp * 1.32 + 25);
 
-    // Stat gains
     this.maxHp = Math.round(this.maxHp + 18);
     this.hp = Math.min(this.maxHp, this.hp + Math.round(this.maxHp * 0.45));
     this.baseDamage = Math.round(this.baseDamage + 5);
-    this.critChance = Math.min(0.6, this.critChance + 0.015);
-    this.speed = Math.min(320, this.speed + 4);
-    this.magnetRadius = Math.min(260, this.magnetRadius + 10);
+    this.critChance = Math.min(0.65, this.critChance + 0.02);
+    this.speed = Math.min(340, this.speed + 4);
+    this.magnetRadius = Math.min(280, this.magnetRadius + 10);
+
+    sounds.playLevelUp();
 
     if (damageNumbers) {
       damageNumbers.add({
@@ -133,13 +153,10 @@ export class Player {
     this.attackTimer = this.attackCooldown;
     this.swingProgress = 1.0;
 
-    // Calculate critical hit
-    const isCrit = Math.random() < this.critChance;
-    const damage = isCrit
-      ? this.baseDamage * this.critMultiplier
-      : this.baseDamage;
+    sounds.playSlash();
 
-    // Small random damage variance (±8%)
+    const isCrit = Math.random() < this.critChance;
+    const damage = isCrit ? this.baseDamage * this.critMultiplier : this.baseDamage;
     const variance = 0.92 + Math.random() * 0.16;
     const finalDamage = Math.round(damage * variance);
 
@@ -151,6 +168,7 @@ export class Player {
       damage: finalDamage,
       isCrit,
       speed: PLAYER_CONFIG.PROJECTILE_SPEED,
+      color: this.character.bulletColor || '#60a5fa',
     });
 
     return true;
@@ -162,26 +180,29 @@ export class Player {
     this.specialTimer = this.specialCooldown;
     this.swingProgress = 1.0;
 
+    sounds.playExplosion();
+
     const isCrit = Math.random() < this.critChance;
-    const damage = (isCrit ? PLAYER_CONFIG.SPECIAL_DAMAGE * this.critMultiplier : PLAYER_CONFIG.SPECIAL_DAMAGE);
+    const damage = isCrit ? PLAYER_CONFIG.SPECIAL_DAMAGE * this.critMultiplier : PLAYER_CONFIG.SPECIAL_DAMAGE;
 
     projectileManager.spawnWhirlwindNova({
       x: this.x,
       y: this.y,
       damage: Math.round(damage),
       isCrit,
-      count: 10,
-      speed: 420,
+      count: 12,
+      speed: 450,
+      color: this.character.color || '#a855f7',
     });
 
     if (particleSystem) {
       particleSystem.emit({
         x: this.x,
         y: this.y,
-        count: 20,
+        count: 24,
         speedMin: 80,
-        speedMax: 200,
-        colors: ['#a855f7', '#c084fc', '#ffffff'],
+        speedMax: 220,
+        colors: [this.character.color || '#a855f7', '#ffffff'],
         shape: 'spark',
         glow: true,
       });
@@ -206,6 +227,8 @@ export class Player {
     this.currentDashTime = this.dashDuration;
     this.dashTimer = this.dashCooldown;
 
+    sounds.playDash();
+
     if (particleSystem) {
       particleSystem.createDashTrail(this.x, this.y, this.radius);
     }
@@ -215,23 +238,19 @@ export class Player {
   update(dt, inputManager, projectileManager, particleSystem) {
     if (this.isDead) return;
 
-    // Cooldown timers
     if (this.attackTimer > 0) this.attackTimer -= dt;
     if (this.specialTimer > 0) this.specialTimer -= dt;
     if (this.dashTimer > 0) this.dashTimer -= dt;
     if (this.invulnerableTimer > 0) this.invulnerableTimer -= dt;
 
-    // HP Regeneration
     if (this.hp < this.maxHp) {
       this.hp = Math.min(this.maxHp, this.hp + this.hpRegen * dt);
     }
 
-    // Sword swing animation decay
     if (this.swingProgress > 0) {
       this.swingProgress = Math.max(0, this.swingProgress - dt * 5);
     }
 
-    // Handle Dash Movement vs Normal Movement
     const { dx, dy } = inputManager.getMovementVector();
 
     if (this.isDashing) {
@@ -257,21 +276,17 @@ export class Player {
       }
     }
 
-    // Apply Velocity
     this.x += this.vx * dt;
     this.y += this.vy * dt;
 
-    // Arena Clamping
     const margin = this.radius + 10;
     this.x = Math.max(margin, Math.min(CANVAS_CONFIG.ARENA_WIDTH - margin, this.x));
     this.y = Math.max(margin, Math.min(CANVAS_CONFIG.ARENA_HEIGHT - margin, this.y));
 
-    // Facing direction: align towards cursor
     const mouseWorldX = inputManager.mouse.worldX;
     const mouseWorldY = inputManager.mouse.worldY;
     this.facingAngle = Math.atan2(mouseWorldY - this.y, mouseWorldX - this.x);
 
-    // Attack inputs
     if (inputManager.consumeDash()) {
       this.tryDash(dx, dy, particleSystem);
     }
@@ -302,7 +317,6 @@ export class Player {
     ctx.save();
     ctx.translate(this.x, this.y);
 
-    // Blinking effect when invulnerable
     if (this.invulnerableTimer > 0 && Math.floor(Date.now() / 60) % 2 === 0) {
       ctx.globalAlpha = 0.4;
     }
@@ -313,11 +327,11 @@ export class Player {
     ctx.ellipse(0, this.radius * 0.85, this.radius * 0.9, this.radius * 0.45, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Dash aura / Shield glow
+    // Dash aura
     if (this.isDashing) {
-      ctx.strokeStyle = '#60a5fa';
+      ctx.strokeStyle = this.character.color || '#60a5fa';
       ctx.lineWidth = 4;
-      ctx.shadowColor = '#93c5fd';
+      ctx.shadowColor = this.character.color || '#93c5fd';
       ctx.shadowBlur = 15;
       ctx.beginPath();
       ctx.arc(0, 0, this.radius * 1.3, 0, Math.PI * 2);
@@ -325,42 +339,39 @@ export class Player {
       ctx.shadowBlur = 0;
     }
 
-    // Rotate player body towards facingAngle
     ctx.rotate(this.facingAngle);
 
-    // Knight Body Armor
+    // Body
     ctx.fillStyle = '#1e293b';
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = this.character.color || '#64748b';
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    // Shoulder Pauldrons
-    ctx.fillStyle = '#3b82f6';
+    // Shoulder Pauldrons / Hero Color
+    ctx.fillStyle = this.character.color || '#3b82f6';
     ctx.beginPath();
     ctx.arc(0, -this.radius * 0.7, 7, 0, Math.PI * 2);
     ctx.arc(0, this.radius * 0.7, 7, 0, Math.PI * 2);
     ctx.fill();
 
     // Visor glowing slit
-    ctx.fillStyle = '#38bdf8';
-    ctx.shadowColor = '#38bdf8';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = this.character.color || '#38bdf8';
     ctx.shadowBlur = 8;
     ctx.fillRect(this.radius * 0.2, -3, 8, 6);
     ctx.shadowBlur = 0;
 
-    // Sword Weapon & Swing Arc
+    // Weapon Swing / Render
     const swordOffsetAngle = this.swingProgress > 0 ? (0.5 - this.swingProgress) * 1.8 : 0.4;
     ctx.save();
     ctx.rotate(swordOffsetAngle);
 
-    // Sword Blade
     ctx.fillStyle = '#e2e8f0';
     ctx.fillRect(this.radius * 0.7, -2.5, 22, 5);
 
-    // Sword Tip
     ctx.beginPath();
     ctx.moveTo(this.radius * 0.7 + 22, -2.5);
     ctx.lineTo(this.radius * 0.7 + 29, 0);
@@ -368,8 +379,7 @@ export class Player {
     ctx.closePath();
     ctx.fill();
 
-    // Sword Crossguard & Pommel
-    ctx.fillStyle = '#f59e0b';
+    ctx.fillStyle = this.character.color || '#f59e0b';
     ctx.fillRect(this.radius * 0.65, -6, 4, 12);
     ctx.fillStyle = '#94a3b8';
     ctx.fillRect(this.radius * 0.35, -2, 7, 4);

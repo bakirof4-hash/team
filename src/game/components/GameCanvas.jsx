@@ -1,9 +1,14 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from '../engine/GameEngine.js';
+import { sounds } from '../engine/SoundSystem.js';
+import { saveNewScore } from '../../data/leaderboardData.js';
 
-export const GameCanvas = () => {
+export const GameCanvas = ({ user, gameConfig, onReturnToDashboard }) => {
   const canvasRef = useRef(null);
   const engineRef = useRef(null);
+
+  const character = gameConfig?.character || { name: 'Jangchi Paladin', icon: '⚔️', color: '#38bdf8' };
+  const difficulty = gameConfig?.difficulty || { name: 'O‘rtacha', icon: '🟡', color: '#eab308' };
 
   const [gameState, setGameState] = useState({
     hp: 120,
@@ -21,10 +26,11 @@ export const GameCanvas = () => {
   });
 
   const [isGameOver, setIsGameOver] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const [gameOverStats, setGameOverStats] = useState(null);
   const [waveBanner, setWaveBanner] = useState(null);
 
-  // Resize canvas handler
   const handleResize = useCallback(() => {
     if (!canvasRef.current || !engineRef.current) return;
     const width = window.innerWidth;
@@ -34,15 +40,27 @@ export const GameCanvas = () => {
     engineRef.current.resize(width, height);
   }, []);
 
+  // Listen for Pause (P or ESC) keypresses
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+        if (!isGameOver) {
+          togglePause();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isGameOver, isPaused]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Set initial size
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    const engine = new GameEngine(canvas);
+    const engine = new GameEngine(canvas, gameConfig?.character, gameConfig?.difficulty);
     engineRef.current = engine;
 
     engine.onStateUpdate = (state) => {
@@ -51,8 +69,16 @@ export const GameCanvas = () => {
 
     engine.onGameOver = (stats) => {
       setIsGameOver(true);
-      setGameOverStats(stats);
+      const fullStats = {
+        ...stats,
+        characterName: character.name,
+      };
+      setGameOverStats(fullStats);
       engine.pause();
+
+      if (user) {
+        saveNewScore(user, fullStats);
+      }
     };
 
     engine.onWaveBanner = (bannerData) => {
@@ -63,18 +89,34 @@ export const GameCanvas = () => {
     };
 
     engine.start();
-
     window.addEventListener('resize', handleResize);
 
     return () => {
       window.removeEventListener('resize', handleResize);
       engine.destroy();
     };
-  }, [handleResize]);
+  }, [handleResize, gameConfig, user]);
+
+  const togglePause = () => {
+    if (!engineRef.current) return;
+    if (isPaused) {
+      engineRef.current.resume();
+      setIsPaused(false);
+    } else {
+      engineRef.current.pause();
+      setIsPaused(true);
+    }
+  };
+
+  const handleToggleSound = () => {
+    const muted = sounds.toggleMute();
+    setIsMuted(muted);
+  };
 
   const handleRestart = () => {
     setIsGameOver(false);
     setGameOverStats(null);
+    setIsPaused(false);
     if (engineRef.current) {
       engineRef.current.restart();
     }
@@ -87,15 +129,16 @@ export const GameCanvas = () => {
     <div style={styles.container}>
       <canvas ref={canvasRef} style={styles.canvas} />
 
-      {/* Top Left: Player Status Bar */}
+      {/* Top Left: Hero Avatar & HP/XP Bars */}
       <div style={styles.topLeftHud}>
         <div style={styles.hudCard}>
-          {/* Level Badge & HP */}
           <div style={styles.hpRow}>
-            <div style={styles.levelBadge}>Lv.{gameState.level}</div>
+            <div style={{ ...styles.heroAvatarBadge, backgroundColor: character.color || '#2563eb' }}>
+              {character.icon} Lv.{gameState.level}
+            </div>
             <div style={styles.barContainer}>
               <div style={styles.barHeader}>
-                <span style={styles.barLabel}>HP</span>
+                <span style={styles.barLabel}>HP ({character.name})</span>
                 <span style={styles.barValue}>{gameState.hp} / {gameState.maxHp}</span>
               </div>
               <div style={styles.barBg}>
@@ -104,7 +147,6 @@ export const GameCanvas = () => {
             </div>
           </div>
 
-          {/* XP Bar */}
           <div style={styles.xpRow}>
             <div style={styles.barHeader}>
               <span style={styles.xpLabel}>EXP</span>
@@ -124,7 +166,7 @@ export const GameCanvas = () => {
             <div style={styles.bossHeader}>
               <span style={styles.bossName}>{gameState.boss.name}</span>
               <span style={styles.bossPhaseBadge}>
-                {gameState.boss.phase === 2 ? 'PHASE 2 (ENRAGED)' : 'PHASE 1'}
+                {gameState.boss.phase === 2 ? 'FAZA 2 (QAZABLI)' : 'FAZA 1'}
               </span>
             </div>
             <div style={styles.bossBarBg}>
@@ -143,9 +185,14 @@ export const GameCanvas = () => {
         </div>
       )}
 
-      {/* Top Right: Wave, Gold, Kills Counter */}
+      {/* Top Right: Stats & Pause Button */}
       <div style={styles.topRightHud}>
         <div style={styles.hudStatsCard}>
+          <div style={styles.statItem}>
+            <span style={{ color: difficulty.color, fontWeight: 'bold', fontSize: '12px' }}>
+              {difficulty.icon} {difficulty.name}
+            </span>
+          </div>
           <div style={styles.statItem}>
             <span style={styles.statIcon}>⚔️</span>
             <span style={styles.statText}>Wave {gameState.wave}</span>
@@ -158,10 +205,13 @@ export const GameCanvas = () => {
             <span style={styles.statIcon}>💀</span>
             <span style={styles.statText}>{gameState.kills} Kills</span>
           </div>
+          <button style={styles.pauseHudBtn} onClick={togglePause} title="Pausa (P / ESC)">
+            ⏸️
+          </button>
         </div>
       </div>
 
-      {/* Bottom Center: Ability & Controls Overlay */}
+      {/* Bottom Center: Abilities Bar */}
       <div style={styles.bottomCenterHud}>
         <div style={styles.abilityBar}>
           <div style={styles.abilitySlot}>
@@ -185,11 +235,11 @@ export const GameCanvas = () => {
           </div>
 
           <div style={styles.controlsInfo}>
-            <span>WASD / Arrows: Move</span>
+            <span>WASD: Move</span>
             <span>•</span>
             <span>LMB: Attack</span>
             <span>•</span>
-            <span>Mouse: Aim</span>
+            <span>P / ESC: Pause</span>
           </div>
         </div>
       </div>
@@ -202,47 +252,86 @@ export const GameCanvas = () => {
               {waveBanner.bannerText
                 ? waveBanner.bannerText
                 : waveBanner.isBossWave
-                ? `⚠️ WAVE ${waveBanner.wave}: BOSS BATTLE ⚠️`
+                ? `⚠️ WAVE ${waveBanner.wave}: MALAKOR BOSS BATTLE ⚠️`
                 : `⚔️ WAVE ${waveBanner.wave} ⚔️`}
             </h2>
             {waveBanner.unlockedTypes && (
               <p style={styles.waveBannerSub}>
-                Enemies: {waveBanner.unlockedTypes.join(', ')}
+                Zombilar: {waveBanner.unlockedTypes.join(', ')}
               </p>
             )}
           </div>
         </div>
       )}
 
-      {/* Game Over Screen */}
-      {isGameOver && gameOverStats && (
+      {/* Pause Menu Modal */}
+      {isPaused && !isGameOver && (
         <div style={styles.modalBackdrop}>
           <div style={styles.modalCard}>
+            <h1 style={{ color: '#38bdf8', margin: '0 0 8px 0', fontSize: '28px' }}>PAUSA</h1>
+            <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '20px' }}>
+              O‘yin vaqtincha to‘xtatildi. Tayyor bo‘lganda davom eting.
+            </p>
+
+            <div style={styles.pauseMenuButtons}>
+              <button style={styles.resumeBtn} onClick={togglePause}>
+                ▶️ O‘YINNI DAVOM ETTIRISH
+              </button>
+              <button style={styles.soundBtn} onClick={handleToggleSound}>
+                {isMuted ? '🔇 OVOZNI YOQISH' : '🔊 OVOZNI O‘CHIRISH'}
+              </button>
+              <button style={styles.homeBtn} onClick={onReturnToDashboard}>
+                🏠 DASHBOARDGA QAYTISH
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Game Over Modal */}
+      {isGameOver && gameOverStats && (
+        <div style={styles.modalBackdrop}>
+          <div style={styles.gameOverCard}>
             <h1 style={styles.gameOverTitle}>YOU DIED</h1>
-            <p style={styles.gameOverSubtitle}>The abyss claimed your soul.</p>
+            <p style={styles.gameOverSubtitle}>Zombilar to‘dasi sizni mahv etdi!</p>
 
             <div style={styles.statsSummary}>
               <div style={styles.summaryRow}>
-                <span>Wave Reached:</span>
+                <span>Qahramon:</span>
+                <strong style={{ color: character.color }}>{character.icon} {character.name}</strong>
+              </div>
+              <div style={styles.summaryRow}>
+                <span>Qiyinlik:</span>
+                <strong style={{ color: difficulty.color }}>{difficulty.icon} {difficulty.name}</strong>
+              </div>
+              <div style={styles.summaryRow}>
+                <span>Yetilgan Wave:</span>
                 <strong>Wave {gameOverStats.wave}</strong>
               </div>
               <div style={styles.summaryRow}>
-                <span>Enemies Slain:</span>
-                <strong>{gameOverStats.kills}</strong>
+                <span>O‘ldirilgan Zombilar:</span>
+                <strong style={{ color: '#fca5a5' }}>💀 {gameOverStats.kills}</strong>
               </div>
               <div style={styles.summaryRow}>
-                <span>Gold Collected:</span>
-                <strong style={{ color: '#facc15' }}>{gameOverStats.gold}g</strong>
+                <span>Yig‘ilgan Gold:</span>
+                <strong style={{ color: '#facc15' }}>💰 {gameOverStats.gold}g</strong>
               </div>
               <div style={styles.summaryRow}>
-                <span>Hero Level:</span>
-                <strong style={{ color: '#38bdf8' }}>Level {gameOverStats.level}</strong>
+                <span>Umumiy Reyting Balli:</span>
+                <strong style={{ color: '#4ade80', fontSize: '16px' }}>
+                  🏆 {((gameOverStats.kills * 25) + (gameOverStats.wave * 350) + (gameOverStats.gold * 2)).toLocaleString()} pts
+                </strong>
               </div>
             </div>
 
-            <button style={styles.restartButton} onClick={handleRestart}>
-              PLAY AGAIN
-            </button>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button style={styles.restartButton} onClick={handleRestart}>
+                🔄 YANA O‘YNAASH
+              </button>
+              <button style={styles.returnBtn} onClick={onReturnToDashboard}>
+                🏠 DASHBOARDGA
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -274,13 +363,13 @@ const styles = {
     pointerEvents: 'none',
   },
   hudCard: {
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
     backdropFilter: 'blur(8px)',
     border: '1px solid rgba(51, 65, 85, 0.6)',
     borderRadius: '12px',
     padding: '12px 16px',
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
-    width: '260px',
+    width: '270px',
   },
   hpRow: {
     display: 'flex',
@@ -288,14 +377,14 @@ const styles = {
     gap: '10px',
     marginBottom: '8px',
   },
-  levelBadge: {
-    backgroundColor: '#2563eb',
+  heroAvatarBadge: {
     color: '#ffffff',
     fontWeight: 'bold',
-    fontSize: '13px',
-    padding: '4px 8px',
-    borderRadius: '6px',
-    boxShadow: '0 2px 6px rgba(37, 99, 235, 0.4)',
+    fontSize: '12px',
+    padding: '6px 10px',
+    borderRadius: '8px',
+    boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+    whiteSpace: 'nowrap',
   },
   barContainer: {
     flex: 1,
@@ -400,17 +489,16 @@ const styles = {
     top: '16px',
     right: '16px',
     zIndex: 10,
-    pointerEvents: 'none',
   },
   hudStatsCard: {
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
     backdropFilter: 'blur(8px)',
     border: '1px solid rgba(51, 65, 85, 0.6)',
     borderRadius: '12px',
-    padding: '10px 16px',
+    padding: '8px 16px',
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
+    gap: '14px',
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
   },
   statItem: {
@@ -431,6 +519,14 @@ const styles = {
     fontWeight: '700',
     fontSize: '14px',
   },
+  pauseHudBtn: {
+    backgroundColor: '#1e293b',
+    border: '1px solid #475569',
+    borderRadius: '8px',
+    padding: '6px 10px',
+    cursor: 'pointer',
+    fontSize: '14px',
+  },
   bottomCenterHud: {
     position: 'absolute',
     bottom: '20px',
@@ -443,7 +539,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
     backdropFilter: 'blur(8px)',
     border: '1px solid rgba(51, 65, 85, 0.6)',
     borderRadius: '14px',
@@ -456,7 +552,7 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '64px',
+    width: '68px',
     height: '52px',
     backgroundColor: 'rgba(30, 41, 59, 0.8)',
     borderRadius: '8px',
@@ -504,7 +600,6 @@ const styles = {
     transform: 'translateX(-50%)',
     zIndex: 20,
     pointerEvents: 'none',
-    animation: 'fadeIn 0.3s ease-in-out',
   },
   waveBannerContent: {
     backgroundColor: 'rgba(15, 23, 42, 0.92)',
@@ -533,8 +628,8 @@ const styles = {
     left: 0,
     width: '100%',
     height: '100%',
-    backgroundColor: 'rgba(0, 0, 0, 0.82)',
-    backdropFilter: 'blur(6px)',
+    backgroundColor: 'rgba(5, 8, 18, 0.88)',
+    backdropFilter: 'blur(8px)',
     zIndex: 50,
     display: 'flex',
     alignItems: 'center',
@@ -542,12 +637,57 @@ const styles = {
   },
   modalCard: {
     backgroundColor: '#0f172a',
+    border: '2px solid #38bdf8',
+    borderRadius: '16px',
+    padding: '32px 40px',
+    textAlign: 'center',
+    boxShadow: '0 0 50px rgba(56, 189, 248, 0.3)',
+    maxWidth: '380px',
+    width: '90%',
+  },
+  pauseMenuButtons: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  resumeBtn: {
+    backgroundColor: '#2563eb',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '10px',
+    padding: '12px',
+    fontWeight: 'bold',
+    fontSize: '14px',
+    cursor: 'pointer',
+  },
+  soundBtn: {
+    backgroundColor: '#1e293b',
+    border: '1px solid #475569',
+    color: '#ffffff',
+    borderRadius: '10px',
+    padding: '12px',
+    fontWeight: 'bold',
+    fontSize: '14px',
+    cursor: 'pointer',
+  },
+  homeBtn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    border: '1px solid #ef4444',
+    color: '#fca5a5',
+    borderRadius: '10px',
+    padding: '12px',
+    fontWeight: 'bold',
+    fontSize: '14px',
+    cursor: 'pointer',
+  },
+  gameOverCard: {
+    backgroundColor: '#0f172a',
     border: '2px solid #ef4444',
     borderRadius: '16px',
     padding: '32px 40px',
     textAlign: 'center',
     boxShadow: '0 0 50px rgba(239, 68, 68, 0.4)',
-    maxWidth: '400px',
+    maxWidth: '420px',
     width: '90%',
   },
   gameOverTitle: {
@@ -558,7 +698,7 @@ const styles = {
     letterSpacing: '2px',
   },
   gameOverSubtitle: {
-    margin: '8px 0 24px 0',
+    margin: '8px 0 20px 0',
     color: '#94a3b8',
     fontSize: '14px',
   },
@@ -566,7 +706,7 @@ const styles = {
     backgroundColor: 'rgba(30, 41, 59, 0.6)',
     borderRadius: '10px',
     padding: '16px',
-    marginBottom: '24px',
+    marginBottom: '20px',
     display: 'flex',
     flexDirection: 'column',
     gap: '10px',
@@ -578,16 +718,25 @@ const styles = {
     justifyContent: 'space-between',
   },
   restartButton: {
+    flex: 1,
     backgroundColor: '#ef4444',
     color: '#ffffff',
     border: 'none',
     borderRadius: '8px',
-    padding: '12px 28px',
-    fontSize: '16px',
+    padding: '12px',
+    fontSize: '14px',
     fontWeight: 'bold',
     cursor: 'pointer',
-    letterSpacing: '1px',
-    boxShadow: '0 4px 16px rgba(239, 68, 68, 0.5)',
-    transition: 'all 0.2s ease',
+  },
+  returnBtn: {
+    flex: 1,
+    backgroundColor: '#1e293b',
+    border: '1px solid #475569',
+    color: '#ffffff',
+    borderRadius: '8px',
+    padding: '12px',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
   },
 };
