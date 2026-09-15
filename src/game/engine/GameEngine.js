@@ -9,14 +9,19 @@ import { DamageNumbers } from './DamageNumbers.js';
 import { Renderer } from './Renderer.js';
 
 export class GameEngine {
-  constructor(canvas) {
+  constructor(canvas, characterConfig = null, difficultyConfig = null) {
     this.canvas = canvas;
     this.renderer = new Renderer(canvas);
     this.input = new InputManager();
+    this.characterConfig = characterConfig;
+    this.difficultyConfig = difficultyConfig;
 
     // Game Core Systems
-    this.player = new Player();
+    this.player = new Player(undefined, undefined, characterConfig);
     this.enemySpawner = new EnemySpawner();
+    if (difficultyConfig) {
+      this.enemySpawner.setDifficulty(difficultyConfig);
+    }
     this.projectiles = new ProjectileManager();
     this.drops = new DropsManager();
     this.combat = new CombatSystem();
@@ -86,8 +91,11 @@ export class GameEngine {
     this.stop();
 
     // Reset all game systems
-    this.player = new Player();
+    this.player = new Player(undefined, undefined, this.characterConfig);
     this.enemySpawner.clear();
+    if (this.difficultyConfig) {
+      this.enemySpawner.setDifficulty(this.difficultyConfig);
+    }
     this.projectiles.clear();
     this.drops.clear();
     this.particles.clear();
