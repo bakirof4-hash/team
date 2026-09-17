@@ -28,6 +28,7 @@ export const GameCanvas = ({ user, gameConfig, onReturnToDashboard }) => {
   const [isGameOver, setIsGameOver] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [quality, setQuality] = useState('high');
   const [gameOverStats, setGameOverStats] = useState(null);
   const [waveBanner, setWaveBanner] = useState(null);
 
@@ -111,6 +112,13 @@ export const GameCanvas = ({ user, gameConfig, onReturnToDashboard }) => {
   const handleToggleSound = () => {
     const muted = sounds.toggleMute();
     setIsMuted(muted);
+  };
+
+  const handleQualityChange = (newQuality) => {
+    setQuality(newQuality);
+    if (engineRef.current) {
+      engineRef.current.setQuality(newQuality);
+    }
   };
 
   const handleRestart = () => {
@@ -205,6 +213,11 @@ export const GameCanvas = ({ user, gameConfig, onReturnToDashboard }) => {
             <span style={styles.statIcon}>💀</span>
             <span style={styles.statText}>{gameState.kills} Kills</span>
           </div>
+          <div style={styles.statItem}>
+            <span style={{ color: '#38bdf8', fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase' }}>
+              🎮 3D {quality}
+            </span>
+          </div>
           <button style={styles.pauseHudBtn} onClick={togglePause} title="Pausa (P / ESC)">
             ⏸️
           </button>
@@ -277,6 +290,37 @@ export const GameCanvas = ({ user, gameConfig, onReturnToDashboard }) => {
               <button style={styles.resumeBtn} onClick={togglePause}>
                 ▶️ O‘YINNI DAVOM ETTIRISH
               </button>
+
+              {/* Quality Preset Switcher */}
+              <div style={{ margin: '10px 0', textAlign: 'left' }}>
+                <div style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 'bold', marginBottom: '6px', letterSpacing: '0.5px' }}>
+                  GRAFIKA SIFATI (FPS OPTIMIZATSIYA):
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {['low', 'medium', 'high'].map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => handleQualityChange(q)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 4px',
+                        borderRadius: '6px',
+                        border: quality === q ? '2px solid #38bdf8' : '1px solid #334155',
+                        backgroundColor: quality === q ? '#0284c7' : '#1e293b',
+                        color: '#ffffff',
+                        fontWeight: 'bold',
+                        fontSize: '11px',
+                        cursor: 'pointer',
+                        textTransform: 'uppercase',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      {q === 'low' ? '⚡ LOW (60+ FPS)' : q === 'medium' ? '⚖️ MEDIUM' : '✨ HIGH (ULTRA 3D)'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <button style={styles.soundBtn} onClick={handleToggleSound}>
                 {isMuted ? '🔇 OVOZNI YOQISH' : '🔊 OVOZNI O‘CHIRISH'}
               </button>

@@ -23,16 +23,23 @@ export class InputManager {
     this.camera = null;
   }
 
-  attach(canvas, camera) {
+  attach(canvas, rendererOrCamera) {
     this.canvas = canvas;
-    this.camera = camera;
+    this.renderer = rendererOrCamera;
+    this.camera = rendererOrCamera?.camera || rendererOrCamera;
 
     // Default mouse to center
     this.mouse.x = canvas.width / 2;
     this.mouse.y = canvas.height / 2;
-    if (camera) {
-      this.mouse.worldX = this.mouse.x + camera.x;
-      this.mouse.worldY = this.mouse.y + camera.y;
+    if (this.renderer && typeof this.renderer.screenToGround2D === 'function') {
+      const pt = this.renderer.screenToGround2D(this.mouse.x, this.mouse.y);
+      if (pt) {
+        this.mouse.worldX = pt.worldX;
+        this.mouse.worldY = pt.worldY;
+      }
+    } else if (this.camera) {
+      this.mouse.worldX = this.mouse.x + (this.camera.x || 0);
+      this.mouse.worldY = this.mouse.y + (this.camera.y || 0);
     }
 
     window.addEventListener('keydown', this._onKeyDown);
@@ -64,9 +71,15 @@ export class InputManager {
     this.mouse.x = (e.clientX - rect.left) * scaleX;
     this.mouse.y = (e.clientY - rect.top) * scaleY;
 
-    if (this.camera) {
-      this.mouse.worldX = this.mouse.x + this.camera.x;
-      this.mouse.worldY = this.mouse.y + this.camera.y;
+    if (this.renderer && typeof this.renderer.screenToGround2D === 'function') {
+      const pt = this.renderer.screenToGround2D(this.mouse.x, this.mouse.y);
+      if (pt) {
+        this.mouse.worldX = pt.worldX;
+        this.mouse.worldY = pt.worldY;
+      }
+    } else if (this.camera) {
+      this.mouse.worldX = this.mouse.x + (this.camera.x || 0);
+      this.mouse.worldY = this.mouse.y + (this.camera.y || 0);
     } else {
       this.mouse.worldX = this.mouse.x;
       this.mouse.worldY = this.mouse.y;
@@ -162,11 +175,18 @@ export class InputManager {
     return requested;
   }
 
-  updateWorldMouse(camera) {
-    this.camera = camera;
-    if (this.camera) {
-      this.mouse.worldX = this.mouse.x + this.camera.x;
-      this.mouse.worldY = this.mouse.y + this.camera.y;
+  updateWorldMouse(rendererOrCamera) {
+    if (rendererOrCamera && typeof rendererOrCamera.screenToGround2D === 'function') {
+      this.renderer = rendererOrCamera;
+      const pt = rendererOrCamera.screenToGround2D(this.mouse.x, this.mouse.y);
+      if (pt) {
+        this.mouse.worldX = pt.worldX;
+        this.mouse.worldY = pt.worldY;
+      }
+    } else if (rendererOrCamera) {
+      this.camera = rendererOrCamera;
+      this.mouse.worldX = this.mouse.x + (rendererOrCamera.x || 0);
+      this.mouse.worldY = this.mouse.y + (rendererOrCamera.y || 0);
     }
   }
 }

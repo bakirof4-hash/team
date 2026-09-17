@@ -6,12 +6,12 @@ import { DropsManager } from './DropsSystem.js';
 import { CombatSystem } from './CombatSystem.js';
 import { ParticleSystem } from './ParticleSystem.js';
 import { DamageNumbers } from './DamageNumbers.js';
-import { Renderer } from './Renderer.js';
+import { Renderer3D } from './Renderer3D.js';
 
 export class GameEngine {
   constructor(canvas, characterConfig = null, difficultyConfig = null) {
     this.canvas = canvas;
-    this.renderer = new Renderer(canvas);
+    this.renderer = new Renderer3D(canvas);
     this.input = new InputManager();
     this.characterConfig = characterConfig;
     this.difficultyConfig = difficultyConfig;
@@ -40,8 +40,8 @@ export class GameEngine {
     this.onGameOver = null;
     this.onWaveBanner = null;
 
-    // Attach input listeners
-    this.input.attach(this.canvas, this.renderer.camera);
+    // Attach input listeners with 3D raycast support
+    this.input.attach(this.canvas, this.renderer);
 
     // Setup Spawner Callbacks
     this.enemySpawner.setCallbacks({
@@ -115,6 +115,15 @@ export class GameEngine {
   destroy() {
     this.stop();
     this.input.detach();
+    if (this.renderer && typeof this.renderer.destroy === 'function') {
+      this.renderer.destroy();
+    }
+  }
+
+  setQuality(preset) {
+    if (this.renderer && typeof this.renderer.setQuality === 'function') {
+      this.renderer.setQuality(preset);
+    }
   }
 
   resize(width, height) {
@@ -140,8 +149,8 @@ export class GameEngine {
   }
 
   update(dt) {
-    // 1. Update Input with current camera
-    this.input.updateWorldMouse(this.renderer.camera);
+    // 1. Update Input with 3D ground plane raycasting
+    this.input.updateWorldMouse(this.renderer);
 
     // 2. Update Player
     this.player.update(dt, this.input, this.projectiles, this.particles);
