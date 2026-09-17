@@ -9,9 +9,10 @@ import { DamageNumbers } from './DamageNumbers.js';
 import { Renderer } from './Renderer.js';
 
 export class GameEngine {
-  constructor(canvas, characterConfig = null, difficultyConfig = null) {
+  constructor(canvas, characterConfig = null, difficultyConfig = null, zoneConfig = null) {
     this.canvas = canvas;
-    this.renderer = new Renderer(canvas);
+    this.zoneConfig = zoneConfig;
+    this.renderer = new Renderer(canvas, zoneConfig);
     this.input = new InputManager();
     this.characterConfig = characterConfig;
     this.difficultyConfig = difficultyConfig;
@@ -34,6 +35,7 @@ export class GameEngine {
     this.animationFrameId = null;
     this.lastTime = 0;
     this.uiUpdateTimer = 0;
+    this.timeElapsed = 0;
 
     // Callbacks
     this.onStateUpdate = null;
@@ -89,6 +91,7 @@ export class GameEngine {
 
   restart() {
     this.stop();
+    this.timeElapsed = 0;
 
     // Reset all game systems
     this.player = new Player(undefined, undefined, this.characterConfig);
@@ -140,6 +143,8 @@ export class GameEngine {
   }
 
   update(dt) {
+    this.timeElapsed += dt;
+
     // 1. Update Input with current camera
     this.input.updateWorldMouse(this.renderer.camera);
 
@@ -188,6 +193,7 @@ export class GameEngine {
         gold: this.player.gold,
         wave: this.enemySpawner.wave,
         level: this.player.level,
+        timeElapsed: Math.floor(this.timeElapsed),
       });
     }
 
@@ -210,11 +216,28 @@ export class GameEngine {
       particleSystem: this.particles,
       damageNumbers: this.damageNumbers,
       inputManager: this.input,
+      time: this.timeElapsed,
     });
   }
 
   dispatchUIState() {
     const boss = this.enemySpawner.boss;
+    const enemyDots = this.enemySpawner.enemies.slice(0, 35).map((e) => ({
+      x: Math.round(e.x),
+      y: Math.round(e.y),
+      color: e.color || '#ef4444',
+      isBoss: false,
+    }));
+
+    if (boss && !boss.isDead) {
+      enemyDots.push({
+        x: Math.round(boss.x),
+        y: Math.round(boss.y),
+        color: '#dc2626',
+        isBoss: true,
+      });
+    }
+
     this.onStateUpdate({
       hp: Math.max(0, Math.round(this.player.hp)),
       maxHp: this.player.maxHp,
@@ -224,9 +247,12 @@ export class GameEngine {
       gold: this.player.gold,
       kills: this.player.kills,
       wave: this.enemySpawner.wave,
+      timeElapsed: Math.floor(this.timeElapsed),
       dashCooldown: Math.max(0, this.player.dashTimer),
       specialCooldown: Math.max(0, this.player.specialTimer),
       enemiesAlive: this.enemySpawner.enemies.length,
+      playerPos: { x: Math.round(this.player.x), y: Math.round(this.player.y) },
+      enemyDots,
       boss: boss && !boss.isDead ? {
         name: boss.name,
         hp: Math.max(0, Math.round(boss.hp)),
