@@ -11,8 +11,9 @@ import { CANVAS_CONFIG } from '../constants.js';
  * 3D projectiles/drops, and performance quality tiers.
  */
 export class Renderer3D {
-  constructor(canvas) {
+  constructor(canvas, zoneConfig = null) {
     this.canvas = canvas;
+    this.zoneConfig = zoneConfig;
     this.arenaWidth = CANVAS_CONFIG.ARENA_WIDTH;
     this.arenaHeight = CANVAS_CONFIG.ARENA_HEIGHT;
 
@@ -39,9 +40,10 @@ export class Renderer3D {
     this.renderer.toneMappingExposure = 1.15;
 
     // 2. Scene & Atmospheric Fog
+    const bgColor = this.zoneConfig?.bg ? new THREE.Color(this.zoneConfig.bg) : new THREE.Color(0x0a0f1d);
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0a0f1d);
-    this.scene.fog = new THREE.FogExp2(0x0a0f1d, 0.0065);
+    this.scene.background = bgColor;
+    this.scene.fog = new THREE.FogExp2(bgColor, 0.0065);
 
     // 3. Perspective Camera
     this.camera = new THREE.PerspectiveCamera(
@@ -124,7 +126,8 @@ export class Renderer3D {
     this.scene.add(this.dirLight.target);
 
     // Dynamic Player Light (glow following hero)
-    this.playerLight = new THREE.PointLight(0x38bdf8, 1.2, 14, 1.2);
+    const lightColor = this.zoneConfig?.accentColor ? parseInt(this.zoneConfig.accentColor.replace('#', '0x'), 16) : 0x38bdf8;
+    this.playerLight = new THREE.PointLight(lightColor, 1.2, 14, 1.2);
     this.playerLight.position.set(0, 2.5, 0);
     this.scene.add(this.playerLight);
   }
