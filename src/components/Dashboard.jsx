@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { CHARACTERS } from '../data/characters.js';
 import { DIFFICULTIES } from '../data/difficulties.js';
 import { MONSTERS } from '../data/monsters.js';
+import { ZONES } from '../data/zones.js';
 import { getLeaderboardData } from '../data/leaderboardData.js';
 import { OnlineLobbyModal } from './OnlineLobbyModal.jsx';
 
 export const Dashboard = ({ user, onStartGame, onLogout }) => {
   const [selectedCharacter, setSelectedCharacter] = useState(CHARACTERS[0]);
   const [selectedDifficulty, setSelectedDifficulty] = useState(DIFFICULTIES[1]);
+  const [selectedZone, setSelectedZone] = useState(ZONES[0]);
   const [gameMode, setGameMode] = useState('solo'); // solo | online
   const [activeTab, setActiveTab] = useState('lobby'); // lobby | characters | monsters | leaderboard | controls
   const [leaderboardTab, setLeaderboardTab] = useState('global'); // global | national
@@ -29,6 +31,7 @@ export const Dashboard = ({ user, onStartGame, onLogout }) => {
       onStartGame({
         character: selectedCharacter,
         difficulty: selectedDifficulty,
+        zone: selectedZone,
         mode: 'solo',
       });
     }
@@ -39,6 +42,7 @@ export const Dashboard = ({ user, onStartGame, onLogout }) => {
     onStartGame({
       character: selectedCharacter,
       difficulty: selectedDifficulty,
+      zone: selectedZone,
       mode: 'online',
       roomName: onlineConfig.room,
     });
@@ -78,6 +82,12 @@ export const Dashboard = ({ user, onStartGame, onLogout }) => {
             onClick={() => setActiveTab('leaderboard')}
           >
             🏆 REYTING (TOP 10)
+          </button>
+          <button
+            style={{ ...styles.navTabBtn, color: activeTab === 'history' ? '#38bdf8' : '#94a3b8' }}
+            onClick={() => setActiveTab('history')}
+          >
+            📊 O‘YIN NATIJALARI
           </button>
           <button
             style={{ ...styles.navTabBtn, color: activeTab === 'controls' ? '#38bdf8' : '#94a3b8' }}
@@ -213,6 +223,47 @@ export const Dashboard = ({ user, onStartGame, onLogout }) => {
                         <strong style={{ color: diff.color }}>{diff.name}</strong>
                       </div>
                       <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>{diff.desc}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Zone / Map Selection (5 Zones) */}
+              <h3 style={{ fontSize: '14px', color: '#94a3b8', marginTop: '16px', marginBottom: '10px' }}>
+                📍 XARITA / ZONANI TANLANG (5 TA ZONA):
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px' }}>
+                {ZONES.map((zn) => {
+                  const isSel = selectedZone.id === zn.id;
+                  return (
+                    <div
+                      key={zn.id}
+                      onClick={() => setSelectedZone(zn)}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        border: `1px solid ${isSel ? zn.color : 'rgba(51, 65, 85, 0.6)'}`,
+                        backgroundColor: isSel ? 'rgba(30, 41, 59, 0.9)' : 'rgba(15, 23, 42, 0.6)',
+                        boxShadow: isSel ? `0 0 16px ${zn.color}55` : 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '20px' }}>{zn.icon}</span>
+                        <div>
+                          <strong style={{ color: zn.color, fontSize: '13px', display: 'block' }}>{zn.name}</strong>
+                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>{zn.description}</span>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', backgroundColor: 'rgba(51,65,85,0.6)', color: zn.color, fontWeight: 'bold' }}>
+                          {zn.dangerLevel}
+                        </span>
+                      </div>
                     </div>
                   );
                 })}
@@ -400,7 +451,122 @@ export const Dashboard = ({ user, onStartGame, onLogout }) => {
           </div>
         )}
 
-        {/* TAB 5: CONTROLS & GUIDE */}
+        {/* TAB 5: MATCH HISTORY CARDS */}
+        {activeTab === 'history' && (
+          <div style={styles.sectionContainer}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={styles.pageTitle}>📊 SAQLANGAN O'YIN NATIJALARI KARTALARI</h2>
+              <button
+                style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                  border: '1px solid #ef4444',
+                  color: '#fca5a5',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                }}
+                onClick={() => {
+                  localStorage.removeItem('zombie_game_history');
+                  window.location.reload();
+                }}
+              >
+                🗑️ Tarixni tozalash
+              </button>
+            </div>
+
+            {(() => {
+              let history = [];
+              try {
+                history = JSON.parse(localStorage.getItem('zombie_game_history') || '[]');
+              } catch (e) {}
+
+              if (history.length === 0) {
+                return (
+                  <div style={{ ...styles.panelCard, textAlign: 'center', padding: '40px' }}>
+                    <h3 style={{ color: '#38bdf8', fontSize: '18px', margin: '0 0 10px 0' }}>
+                      Hozircha saqlangan natijalar kartalari yo'q
+                    </h3>
+                    <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0 }}>
+                      O'yin o'ynaganingizdan so'ng barcha natijalaringiz va statistikangiz bu yerda alohida kartalar shaklida saqlanib boradi!
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: '20px' }}>
+                  {history.map((card) => (
+                    <div
+                      key={card.id}
+                      style={{
+                        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+                        border: '1px solid rgba(56, 189, 248, 0.4)',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        boxShadow: '0 6px 25px rgba(0,0,0,0.5)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                        transition: 'transform 0.2s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <strong style={{ color: card.characterColor || '#38bdf8', fontSize: '16px' }}>
+                            {card.characterIcon || '⚔️'} {card.characterName}
+                          </strong>
+                          <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px' }}>{card.date}</div>
+                        </div>
+                        <div
+                          style={{
+                            padding: '4px 12px',
+                            borderRadius: '8px',
+                            backgroundColor: 'rgba(56, 189, 248, 0.2)',
+                            border: '1px solid #38bdf8',
+                            color: '#38bdf8',
+                            fontWeight: '900',
+                            fontSize: '13px',
+                            letterSpacing: '0.5px',
+                          }}
+                        >
+                          {card.rank || 'RANK'}
+                        </div>
+                      </div>
+
+                      <div style={{ backgroundColor: 'rgba(30, 41, 59, 0.6)', borderRadius: '12px', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#cbd5e1' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>⏱️ Tirik qolgan vaqt:</span>
+                          <strong style={{ color: '#38bdf8' }}>{Math.floor((card.timeElapsed || 0) / 60)}m {(card.timeElapsed || 0) % 60}s</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>⚔️ Yetilgan Wave:</span>
+                          <strong style={{ color: '#eab308' }}>Wave {card.wave}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>💀 O'ldirilgan Zombilar:</span>
+                          <strong style={{ color: '#f87171' }}>{card.kills} ta</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>💰 Yig'ilgan Oltin:</span>
+                          <strong style={{ color: '#facc15' }}>{card.gold}g</strong>
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: 'center', paddingTop: '4px', borderTop: '1px dashed rgba(148, 163, 184, 0.2)' }}>
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>Reyting Balli: </span>
+                        <strong style={{ fontSize: '18px', color: '#4ade80' }}>🏆 {(card.score || 0).toLocaleString()} pts</strong>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* TAB 6: CONTROLS & GUIDE */}
         {activeTab === 'controls' && (
           <div style={styles.sectionContainer}>
             <h2 style={styles.pageTitle}>⌨️ TO‘LIQ BOSHQARUV TUGMALARI VA MASLAHATLAR</h2>
@@ -416,6 +582,10 @@ export const Dashboard = ({ user, onStartGame, onLogout }) => {
                   <div style={styles.keyVisualItem}>
                     <kbd style={styles.kbd}>LMB (Chaq Sichqoncha)</kbd>
                     <span>Asosiy quroldan uzluksiz otish/qilich urish</span>
+                  </div>
+                  <div style={styles.keyVisualItem}>
+                    <kbd style={styles.kbd}>TAB</kbd> yoki <kbd style={styles.kbd}>T</kbd>
+                    <span>Jonli Natijalar Kartasi va Radar xaritasini ko'rish</span>
                   </div>
                   <div style={styles.keyVisualItem}>
                     <kbd style={styles.kbd}>SPACEBAR</kbd>
